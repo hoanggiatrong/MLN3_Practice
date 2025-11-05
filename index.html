@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luyện tập Trắc nghiệm</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ẩn các view theo mặc định */
+        .view {
+            display: none;
+        }
+        /* Hiển thị view-home ban đầu */
+        #view-home {
+            display: block;
+        }
+        /* Lớp cho đáp án đúng */
+        .option-btn.correct {
+            background-color: #22c55e; /* green-500 */
+            color: white;
+            border-color: #16a34a; /* green-600 */
+            font-weight: bold;
+        }
+        /* Lớp cho đáp án sai */
+        .option-btn.incorrect {
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            border-color: #dc2626; /* red-600 */
+        }
+        /* Lớp cho đáp án đúng (khi người dùng chọn sai) */
+        .option-btn.show-correct {
+            background-color: #16a34a; /* green-600 */
+            color: white;
+            border-color: #15803d; /* green-700 */
+        }
+        /* Nút bị vô hiệu hóa */
+        .option-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen">
+
+    <div class="container mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
+        
+        <!-- Header -->
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-center text-blue-700">Luyện tập Trắc nghiệm</h1>
+            <p class="text-center text-gray-600">Ứng dụng ôn tập cá nhân của bạn</p>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="app-container">
+
+            <!-- View 1: Home Screen -->
+            <div id="view-home" class="view space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button onclick="startWrongAnswerQuiz()" id="wrong-answers-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-6 rounded-lg shadow-md transition duration-300 text-lg">
+                        Ôn lại các câu sai
+                        (<span id="wrong-count">0</span> câu)
+                    </button>
+                    <button onclick="showView('view-history')" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-lg shadow-md transition duration-300 text-lg">
+                        Xem lịch sử làm bài
+                    </button>
+                </div>
+                
+                <h2 class="text-2xl font-semibold border-b pb-2">Chọn chương để học</h2>
+                <div id="chapter-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Các chương sẽ được tải vào đây bằng JS -->
+                    <p class="text-gray-500 col-span-full">Đang tải danh sách chương...</p>
+                </div>
+            </div>
+
+            <!-- View 2: Quiz Screen -->
+            <div id="view-quiz" class="view">
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 id="quiz-title" class="text-xl font-semibold text-blue-800"></h2>
+                        <span id="quiz-progress" class="text-gray-600 font-medium"></span>
+                    </div>
+                    
+                    <div class="mb-6 min-h-[100px]">
+                        <p id="question-text" class="text-lg leading-relaxed"></p>
+                    </div>
+                    
+                    <div id="options-container" class="space-y-3">
+                        <!-- Các lựa chọn sẽ được tải vào đây bằng JS -->
+                    </div>
+                    
+                    <div class="mt-6 flex justify-between items-center">
+                        <button onclick="showView('view-home');" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300">
+                            Trang chủ
+                        </button>
+                        <button id="next-question-btn" onclick="nextQuestion()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 hidden">
+                            Tiếp theo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 3: Results Screen -->
+            <div id="view-results" class="view text-center bg-white p-8 rounded-lg shadow-lg">
+                <h2 class="text-3xl font-bold text-green-600 mb-4">Hoàn thành!</h2>
+                <p id="result-summary" class="text-xl mb-6"></p>
+                
+                <div class="space-y-4 sm:space-y-0 sm:flex sm:justify-center sm:space-x-4">
+                    <button id="retry-session-wrong-btn" class="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300" style="display: none;">
+                        Làm lại câu sai (trong bài)
+                    </button>
+                    <button onclick="showView('view-home');" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300">
+                        Về trang chủ
+                    </button>
+                </div>
+            </div>
+
+            <!-- View 4: History Screen -->
+            <div id="view-history" class="view">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold">Lịch sử làm bài</h2>
+                    <button onclick="showView('view-home');" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300">
+                        Quay lại
+                    </button>
+                </div>
+                <div id="history-list-container" class="bg-white p-6 rounded-lg shadow-lg space-y-4">
+                    <!-- Lịch sử sẽ được tải vào đây bằng JS -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        let allData = []; // Sẽ chứa dữ liệu từ file JSON
+        let wrongAnswers = {}; // Lưu các câu trả lời sai (key là ID câu hỏi)
+        let quizHistory = []; // Lưu lịch sử các lần làm bài
+        let currentQuiz = { // Trạng thái của bài quiz hiện tại
+            name: "",
+            questions: [],
+            index: 0,
+            score: 0,
+            wrongInSession: [], // Lưu các câu làm sai trong bài này
+            type: 'chapter' // 'chapter' or 'wrong'
+        };
+
+        const WRONG_ANSWERS_KEY = 'quizAppWrongAnswers';
+        const HISTORY_KEY = 'quizAppHistory';
+        const OPTIONS_LETTERS = ['A', 'B', 'C', 'D'];
+
+        // --- CORE FUNCTIONS ---
+
+        /**
+         * Tải dữ liệu từ file JSON
+         */
+        async function fetchData() {
+            try {
+                // Giả định file JSON nằm cùng thư mục
+                const response = await fetch('index_temp.json'); 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                allData = await response.json();
+                // Sau khi tải dữ liệu thành công, khởi tạo ứng dụng
+                initializeApp();
+            } catch (error) {
+                console.error("Lỗi không tải được file JSON:", error);
+                // Hiển thị lỗi cho người dùng
+                const container = document.getElementById('app-container');
+                container.innerHTML = `
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
+                        <strong class="font-bold">Lỗi!</strong>
+                        <span class="block sm:inline">Không thể tải tệp <code>index_temp.json</code>.</span>
+                        <p class="mt-2">Hãy chắc chắn rằng bạn đã đặt tệp <code>index_temp.json</code> vào cùng thư mục với tệp <code>index.html</code> này và làm mới trang.</p>
+                    </div>`;
+            }
+        }
+
+        /**
+         * Khởi tạo ứng dụng sau khi đã tải xong dữ liệu
+         */
+        function initializeApp() {
+            // Tải dữ liệu đã lưu từ localStorage
+            wrongAnswers = loadData(WRONG_ANSWERS_KEY) || {};
+            quizHistory = loadData(HISTORY_KEY) || [];
+
+            // Hiển thị danh sách chương
+            renderChapterList();
+            // Cập nhật số lượng câu sai
+            updateWrongCount();
+            // Chuẩn bị màn hình lịch sử
+            renderHistoryList();
+        }
+
+        // --- LOCAL STORAGE UTILITIES ---
+
+        function loadData(key) {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : null;
+            } catch (error) {
+                console.error(`Lỗi khi tải dữ liệu từ localStorage (key: ${key}):`, error);
+                return null;
+            }
+        }
+
+        function saveData(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (error) {
+                console.error(`Lỗi khi lưu dữ liệu vào localStorage (key: ${key}):`, error);
+            }
+        }
+
+        // --- VIEW NAVIGATION ---
+
+        /**
+         * Hiển thị một view (màn hình) cụ thể và ẩn các view khác
+         * @param {string} viewId ID của view cần hiển thị (ví dụ: 'view-home')
+         */
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(view => {
+                view.style.display = 'none';
+            });
+            document.getElementById(viewId).style.display = 'block';
+
+            // Khi quay về trang chủ, cập nhật lại các thông tin
+            if (viewId === 'view-home') {
+                updateWrongCount();
+                renderHistoryList(); // Cập nhật luôn danh sách lịch sử
+            }
+        }
+
+        // --- HOME SCREEN LOGIC ---
+
+        /**
+         * Hiển thị danh sách các chương lên trang chủ
+         */
+        function renderChapterList() {
+            const chapterList = document.getElementById('chapter-list');
+            if (allData.length === 0) {
+                chapterList.innerHTML = '<p class="text-red-500 col-span-full">Không tìm thấy dữ liệu câu hỏi.</p>';
+                return;
+            }
+            
+            chapterList.innerHTML = allData.map((chapter, index) => {
+                return `
+                    <button onclick="startChapterQuiz(${index})" class="bg-white hover:bg-blue-50 text-left p-4 rounded-lg shadow-md transition duration-300 border border-gray-200">
+                        <h3 class="font-semibold text-lg text-blue-700">${chapter.chapter}</h3>
+                        <p class="text-gray-600 text-sm">${chapter.questions.length} câu hỏi</p>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        /**
+         * Cập nhật số lượng câu sai trên nút "Ôn lại"
+         */
+        function updateWrongCount() {
+            const count = Object.keys(wrongAnswers).length;
+            document.getElementById('wrong-count').textContent = count;
+            const btn = document.getElementById('wrong-answers-btn');
+            
+            if (count === 0) {
+                btn.disabled = true;
+            } else {
+                btn.disabled = false;
+            }
+        }
+
+        // --- QUIZ LOGIC ---
+
+        /**
+         * Bắt đầu làm bài quiz cho một chương cụ thể
+         * @param {number} chapterIndex Chỉ số của chương trong mảng allData
+         */
+        function startChapterQuiz(chapterIndex) {
+            const chapter = allData[chapterIndex];
+            startQuiz({
+                name: chapter.chapter,
+                questions: shuffleArray([...chapter.questions]), // Xáo trộn câu hỏi
+                type: 'chapter'
+            });
+        }
+
+        /**
+         * Bắt đầu làm bài quiz "Ôn tập câu sai"
+         */
+        function startWrongAnswerQuiz() {
+            const questions = Object.values(wrongAnswers);
+            if (questions.length === 0) {
+                return; // Nút đã bị vô hiệu hóa nên hàm này không được gọi
+            }
+            startQuiz({
+                name: "Ôn tập câu sai",
+                questions: shuffleArray(questions), // Xáo trộn câu hỏi sai
+                type: 'wrong'
+            });
+        }
+
+        /**
+         * Hàm chung để bắt đầu một bài quiz
+         * @param {object} quizConfig Đối tượng cấu hình { name, questions, type }
+         */
+        function startQuiz({ name, questions, type }) {
+            if (!questions || questions.length === 0) {
+                console.warn("Không có câu hỏi để bắt đầu quiz.");
+                return;
+            }
+            
+            currentQuiz = {
+                name: name,
+                questions: questions,
+                index: 0,
+                score: 0,
+                wrongInSession: [],
+                type: type
+            };
+
+            renderQuestion();
+            showView('view-quiz');
+        }
+
+        /**
+         * Hiển thị câu hỏi hiện tại và các lựa chọn
+         */
+        function renderQuestion() {
+            const question = currentQuiz.questions[currentQuiz.index];
+            
+            document.getElementById('quiz-title').textContent = currentQuiz.name;
+            document.getElementById('quiz-progress').textContent = `Câu ${currentQuiz.index + 1} / ${currentQuiz.questions.length}`;
+            document.getElementById('question-text').textContent = question.question;
+
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = question.options.map((option, index) => {
+                const optionLetter = OPTIONS_LETTERS[index]; // 'A', 'B', 'C', 'D'
+                return `
+                    <button class="option-btn w-full text-left bg-white hover:bg-gray-100 border border-gray-300 rounded-lg p-4 transition duration-200" 
+                            onclick="selectOption(this, '${optionLetter}')">
+                        <span class="font-bold mr-3 text-blue-600">${optionLetter}.</span>
+                        ${option}
+                    </button>
+                `;
+            }).join('');
+
+            // Ẩn nút "Tiếp theo"
+            document.getElementById('next-question-btn').style.display = 'none';
+        }
+
+        /**
+         * Xử lý khi người dùng chọn một đáp án
+         * @param {HTMLElement} button Nút đáp án đã được nhấp
+         * @param {string} selectedLetter 'A', 'B', 'C', hoặc 'D'
+         */
+        function selectOption(button, selectedLetter) {
+            const question = currentQuiz.questions[currentQuiz.index];
+            const correctLetter = question.answer;
+
+            // Vô hiệu hóa tất cả các nút lựa chọn
+            const buttons = document.querySelectorAll('.option-btn');
+            buttons.forEach(btn => btn.disabled = true);
+
+            // Hiển thị nút "Tiếp theo"
+            document.getElementById('next-question-btn').style.display = 'block';
+
+            if (selectedLetter === correctLetter) {
+                // Trả lời đúng
+                currentQuiz.score++;
+                button.classList.add('correct');
+
+                // Nếu câu này nằm trong danh sách "sai" và trả lời đúng,
+                // thì xóa nó khỏi danh sách "sai" toàn cục
+                if (currentQuiz.type === 'wrong' || wrongAnswers[question.id]) {
+                    removeWrongAnswer(question.id);
+                }
+            } else {
+                // Trả lời sai
+                button.classList.add('incorrect');
+                // Thêm câu này vào danh sách sai của bài này
+                currentQuiz.wrongInSession.push(question);
+                // Thêm câu này vào danh sách sai toàn cục
+                addWrongAnswer(question);
+                
+                // Hiển thị đáp án đúng
+                buttons.forEach((btn, index) => {
+                    if (OPTIONS_LETTERS[index] === correctLetter) {
+                        btn.classList.add('show-correct');
+                    }
+                });
+            }
+        }
+
+        /**
+         * Chuyển sang câu hỏi tiếp theo hoặc kết thúc bài
+         */
+        function nextQuestion() {
+            if (currentQuiz.index < currentQuiz.questions.length - 1) {
+                currentQuiz.index++;
+                renderQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        /**
+         * Hiển thị màn hình kết quả
+         */
+        function showResults() {
+            const summary = `Bạn đã trả lời đúng ${currentQuiz.score} / ${currentQuiz.questions.length} câu.`;
+            document.getElementById('result-summary').textContent = summary;
+
+            // Lưu lịch sử
+            saveHistory();
+
+            // Xử lý nút "Làm lại câu sai (trong bài)"
+            const retryBtn = document.getElementById('retry-session-wrong-btn');
+            if (currentQuiz.wrongInSession.length > 0) {
+                retryBtn.style.display = 'block';
+                // Clone mảng câu hỏi sai để tránh lỗi khi làm lại
+                const sessionWrongQuestions = [...currentQuiz.wrongInSession];
+                retryBtn.onclick = () => {
+                    startQuiz({
+                        name: `Làm lại câu sai (Bài: ${currentQuiz.name})`,
+                        questions: shuffleArray(sessionWrongQuestions),
+                        type: 'session-wrong'
+                    });
+                };
+            } else {
+                retryBtn.style.display = 'none';
+                retryBtn.onclick = null;
+            }
+
+            showView('view-results');
+        }
+
+        // --- WRONG ANSWER MANAGEMENT ---
+
+        function addWrongAnswer(question) {
+            wrongAnswers[question.id] = question;
+            saveData(WRONG_ANSWERS_KEY, wrongAnswers);
+        }
+
+        function removeWrongAnswer(questionId) {
+            if (wrongAnswers[questionId]) {
+                delete wrongAnswers[questionId];
+                saveData(WRONG_ANSWERS_KEY, wrongAnswers);
+            }
+        }
+
+        // --- HISTORY MANAGEMENT ---
+
+        /**
+         * Lưu kết quả bài làm hiện tại vào lịch sử
+         */
+        function saveHistory() {
+            const session = {
+                id: Date.now(),
+                name: currentQuiz.name,
+                score: currentQuiz.score,
+                total: currentQuiz.questions.length,
+                date: new Date().toLocaleString('vi-VN')
+            };
+            // Thêm vào đầu mảng
+            quizHistory.unshift(session);
+            // Giới hạn 20-30 bài gần nhất
+            if (quizHistory.length > 30) {
+                quizHistory.pop();
+            }
+            saveData(HISTORY_KEY, quizHistory);
+        }
+
+        /**
+         * Hiển thị danh sách lịch sử làm bài
+         */
+        function renderHistoryList() {
+            const container = document.getElementById('history-list-container');
+            if (quizHistory.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">Chưa có lịch sử làm bài.</p>';
+                return;
+            }
+
+            container.innerHTML = quizHistory.map(session => `
+                <div class="border-b border-gray-200 pb-3">
+                    <p class="font-semibold">${session.name}</p>
+                    <p class="text-sm text-gray-600">Ngày: ${session.date}</p>
+                    <p class="text-sm font-medium text-blue-600">Kết quả: ${session.score} / ${session.total}</p>
+                </div>
+            `).join('');
+        }
+
+        // --- UTILITIES ---
+
+        /**
+         * Xáo trộn một mảng (Fisher-Yates shuffle)
+         * @param {Array} array Mảng cần xáo trộn
+         * @returns {Array} Mảng đã được xáo trộn
+         */
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // --- APP START ---
+        // Chờ DOM tải xong mới bắt đầu tải dữ liệu
+        document.addEventListener('DOMContentLoaded', fetchData);
+    </script>
+</body>
+</html>
