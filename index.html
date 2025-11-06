@@ -99,9 +99,14 @@
                         <button onclick="showView('view-home');" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300">
                             Trang chủ
                         </button>
-                        <button id="next-question-btn" onclick="nextQuestion()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 hidden">
-                            Tiếp theo
-                        </button>
+                        <div class="space-x-2">
+                            <button id="prev-question-btn" onclick="previousQuestion()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-300" style="display: none;">
+                                Quay lại
+                            </button>
+                            <button id="next-question-btn" onclick="nextQuestion()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-300 hidden">
+                                Tiếp theo
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -142,17 +147,21 @@
         let allData = []; // Sẽ chứa dữ liệu từ file JSON
         let wrongAnswers = {}; // Lưu các câu trả lời sai (key là ID câu hỏi)
         let quizHistory = []; // Lưu lịch sử các lần làm bài
+        let completedChapters = {}; // Lưu các chương đã hoàn thành (key là tên chương)
+        let userAnswers = []; // Lưu đáp án đã chọn của từng câu trong bài hiện tại
         let currentQuiz = { // Trạng thái của bài quiz hiện tại
             name: "",
             questions: [],
             index: 0,
             score: 0,
             wrongInSession: [], // Lưu các câu làm sai trong bài này
-            type: 'chapter' // 'chapter' or 'wrong'
+            type: 'chapter', // 'chapter' or 'wrong'
+            chapterIndex: null // Thêm để track chương hiện tại
         };
 
         const WRONG_ANSWERS_KEY = 'quizAppWrongAnswers';
         const HISTORY_KEY = 'quizAppHistory';
+        const COMPLETED_CHAPTERS_KEY = 'quizAppCompletedChapters';
         const OPTIONS_LETTERS = ['A', 'B', 'C', 'D'];
 
         // --- CORE FUNCTIONS ---
@@ -190,6 +199,7 @@
             // Tải dữ liệu đã lưu từ localStorage
             wrongAnswers = loadData(WRONG_ANSWERS_KEY) || {};
             quizHistory = loadData(HISTORY_KEY) || [];
+            completedChapters = loadData(COMPLETED_CHAPTERS_KEY) || {};
 
             // Hiển thị danh sách chương
             renderChapterList();
@@ -251,9 +261,18 @@
             }
             
             chapterList.innerHTML = allData.map((chapter, index) => {
+                const isCompleted = completedChapters[chapter.chapter];
+                const bgColor = isCompleted ? 'bg-green-100 hover:bg-green-200' : 'bg-white hover:bg-blue-50';
+                const borderColor = isCompleted ? 'border-green-400' : 'border-gray-200';
+                const titleColor = isCompleted ? 'text-green-700' : 'text-blue-700';
+                const badge = isCompleted ? '<span class="text-xs bg-green-500 text-white px-2 py-1 rounded-full ml-2">✓ Hoàn thành</span>' : '';
+                
                 return `
-                    <button onclick="startChapterQuiz(${index})" class="bg-white hover:bg-blue-50 text-left p-4 rounded-lg shadow-md transition duration-300 border border-gray-200">
-                        <h3 class="font-semibold text-lg text-blue-700">${chapter.chapter}</h3>
+                    <button onclick="startChapterQuiz(${index})" class="${bgColor} text-left p-4 rounded-lg shadow-md transition duration-300 border ${borderColor}">
+                        <h3 class="font-semibold text-lg ${titleColor} flex items-center">
+                            ${chapter.chapter}
+                            ${badge}
+                        </h3>
                         <p class="text-gray-600 text-sm">${chapter.questions.length} câu hỏi</p>
                     </button>
                 `;
@@ -286,7 +305,8 @@
             startQuiz({
                 name: chapter.chapter,
                 questions: [...chapter.questions], // Xáo trộn câu hỏi
-                type: 'chapter'
+                type: 'chapter',
+                chapterIndex: chapterIndex
             });
         }
 
@@ -307,9 +327,9 @@
 
         /**
          * Hàm chung để bắt đầu một bài quiz
-         * @param {object} quizConfig Đối tượng cấu hình { name, questions, type }
+         * @param {object} quizConfig Đối tượng cấu hình { name, questions, type, chapterIndex }
          */
-        function startQuiz({ name, questions, type }) {
+        function startQuiz({ name, questions, type, chapterIndex = null }) {
             if (!questions || questions.length === 0) {
                 console.warn("Không có câu hỏi để bắt đầu quiz.");
                 return;
@@ -321,8 +341,12 @@
                 index: 0,
                 score: 0,
                 wrongInSession: [],
-                type: type
+                type: type,
+                chapterIndex: chapterIndex
             };
+
+            // Reset mảng lưu đáp án
+            userAnswers = new Array(questions.length).fill(null);
 
             renderQuestion();
             showView('view-quiz');
@@ -333,6 +357,7 @@
          */
         function renderQuestion() {
             const question = currentQuiz.questions[currentQuiz.index];
+            const savedAnswer = userAnswers[currentQuiz.index];
             
             document.getElementById('quiz-title').textContent = currentQuiz.name;
             document.getElementById('quiz-progress').textContent = `Câu ${currentQuiz.index + 1} / ${currentQuiz.questions.length}`;
@@ -350,8 +375,32 @@
                 `;
             }).join('');
 
-            // Ẩn nút "Tiếp theo"
-            document.getElementById('next-question-btn').style.display = 'none';
+            // Nếu đã có đáp án được lưu, hiển thị lại trạng thái
+            if (savedAnswer) {
+                const buttons = document.querySelectorAll('.option-btn');
+                buttons.forEach(btn => btn.disabled = true);
+                
+                buttons.forEach((btn, index) => {
+                    const optionLetter = OPTIONS_LETTERS[index];
+                    if (optionLetter === savedAnswer) {
+                        if (savedAnswer === question.answer) {
+                            btn.classList.add('correct');
+                        } else {
+                            btn.classList.add('incorrect');
+                        }
+                    }
+                    if (savedAnswer !== question.answer && optionLetter === question.answer) {
+                        btn.classList.add('show-correct');
+                    }
+                });
+                
+                document.getElementById('next-question-btn').style.display = 'block';
+            } else {
+                document.getElementById('next-question-btn').style.display = 'none';
+            }
+
+            // Cập nhật nút Previous
+            updateNavigationButtons();
         }
 
         /**
@@ -360,8 +409,16 @@
          * @param {string} selectedLetter 'A', 'B', 'C', hoặc 'D'
          */
         function selectOption(button, selectedLetter) {
+            // Nếu đã chọn rồi thì không cho chọn lại
+            if (userAnswers[currentQuiz.index]) {
+                return;
+            }
+
             const question = currentQuiz.questions[currentQuiz.index];
             const correctLetter = question.answer;
+
+            // Lưu đáp án đã chọn
+            userAnswers[currentQuiz.index] = selectedLetter;
 
             // Vô hiệu hóa tất cả các nút lựa chọn
             const buttons = document.querySelectorAll('.option-btn');
@@ -395,6 +452,9 @@
                     }
                 });
             }
+
+            // Cập nhật nút navigation
+            updateNavigationButtons();
         }
 
         /**
@@ -410,11 +470,50 @@
         }
 
         /**
+         * Quay lại câu hỏi trước đó
+         */
+        function previousQuestion() {
+            if (currentQuiz.index > 0) {
+                currentQuiz.index--;
+                renderQuestion();
+            }
+        }
+
+        /**
+         * Cập nhật trạng thái nút Previous và Next
+         */
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prev-question-btn');
+            const nextBtn = document.getElementById('next-question-btn');
+            
+            // Nút Previous chỉ hiển thị khi không phải câu đầu tiên
+            if (currentQuiz.index > 0) {
+                prevBtn.style.display = 'inline-block';
+            } else {
+                prevBtn.style.display = 'none';
+            }
+
+            // Nút Next chỉ hiển thị khi đã trả lời
+            if (userAnswers[currentQuiz.index]) {
+                nextBtn.style.display = 'inline-block';
+            } else {
+                nextBtn.style.display = 'none';
+            }
+        }
+
+        /**
          * Hiển thị màn hình kết quả
          */
         function showResults() {
             const summary = `Bạn đã trả lời đúng ${currentQuiz.score} / ${currentQuiz.questions.length} câu.`;
             document.getElementById('result-summary').textContent = summary;
+
+            // Đánh dấu chương đã hoàn thành nếu là quiz của chương
+            if (currentQuiz.type === 'chapter' && currentQuiz.chapterIndex !== null) {
+                const chapterName = currentQuiz.name;
+                completedChapters[chapterName] = true;
+                saveData(COMPLETED_CHAPTERS_KEY, completedChapters);
+            }
 
             // Lưu lịch sử
             saveHistory();
