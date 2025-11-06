@@ -285,7 +285,7 @@
             const chapter = allData[chapterIndex];
             startQuiz({
                 name: chapter.chapter,
-                questions: shuffleArray([...chapter.questions]), // Xáo trộn câu hỏi
+                questions: [...chapter.questions], // Xáo trộn câu hỏi
                 type: 'chapter'
             });
         }
